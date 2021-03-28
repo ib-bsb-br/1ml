@@ -1,4 +1,4 @@
-local import "prelude"
+import "prelude"
 import "../../basis/list.1ml"
 
 type MONAD = {
@@ -8,7 +8,7 @@ type MONAD = {
 }
 
 return [M : MONAD] x = M.return x
-bind [M : MONAD] m k = M.bind m k
+(>>=) [M : MONAD] m k = M.bind m k
 
 implicit Monad_option = {
   type m a = Opt.t a
@@ -28,8 +28,14 @@ implicit Monad_list = {
 ;;TODO investigate
 ;;test = (return [Monad_option] 5) >>= (fun x => return [Monad_option] x)
 
-;;l = (return [Monad_list] 5) >>= (fun x => return [Monad_list] x)
+l : list _ = return 5 >>= fun x => return x
 
-m = bind (1 :: (2 :: (3 :: nil))) (fun x => return x)
+o : opt _ = return 5 >>= fun x => return x
 
-;;n = bind (return [Monad_list] 5) (fun x => x :: (2 :: (3 :: nil)))
+m = (1 :: (2 :: (3 :: nil))) >>= fun x => return x
+
+n = return 5 >>= fun x => (x :: (2 :: (3 :: nil)))
+
+sequence 'a = rec (f: [M : MONAD] -> list (M.m a) ~> M.m (list a)) => 
+  fun [M : MONAD] (x : list (M.m a)) => 
+    case {nil = return nil, y::ys = y >>= (fun z => f ys >>= fun zs => return (z :: zs)) } x

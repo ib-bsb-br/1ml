@@ -1,14 +1,11 @@
-;; local import "prelude"
-;; ^ fails because of top-level definition issues
-import "prelude"
+import "../../prelude.1ml"
 
 type SHOW = {
     type t
     show : t -> text
 }
 
-show [S : SHOW] x = S.show x
-print [S : SHOW] x = Text.print (show x ++ "\n")
+show [S: SHOW] x = S.show x
 
 implicit Show_int = {
     type t = int
@@ -20,4 +17,11 @@ implicit Show_bool = {
     show x = if x then "true" else "false"
 }
 
-do print 5
+implicit Show_this [S : SHOW] = {
+    type t = S.t
+    show = S.show
+}
+
+test = show 5
+
+do Text.print (test ++ "\n")

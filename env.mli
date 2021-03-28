@@ -13,8 +13,7 @@ val empty : env
 val add_typ : var -> kind -> env -> env
 val add_typs : (var * kind) list -> env -> env
 val add_val : var -> typ -> env -> env
-val add_impl_val : var -> typ -> env -> env
-val add_row : typ row -> env -> bool -> bool -> env
+val add_row : typ row -> env -> bool -> env
 
 val mem_typ : var -> env -> bool
 val mem_val : var -> env -> bool
@@ -26,7 +25,6 @@ val domain_typ : env -> varset
 val domain_val : env -> varset
 
 val names : env -> var list
-val impl_names : env -> var list
 
 
 (* Freshening *)

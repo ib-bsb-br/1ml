@@ -1,0 +1,11 @@
+import "prelude"
+import "../../basis/list.1ml"
+
+type SHOW = {
+    type t
+    show : t ~> text
+}
+
+combine = rec (f : [A : SHOW] -> [B : SHOW] -> list A.t -> list B.t ~> list (A.t, B.t)) => 
+  fun [A : SHOW] [B : SHOW] a b => 
+    case {nil = nil, x::xs = case {nil = nil, y::ys = (x, y) :: (f xs ys)} b} a

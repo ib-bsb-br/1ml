@@ -193,7 +193,25 @@ let rec sub_typ oneway env t1 t2 ps =
        ts, lift env zs, IL.RollE(IL.AppE(f, e1), erase_typ roll_t)
     | _ ->
     match t1', t2' with
+    | t1, WrapT(s2) when oneway && not (is_undet t1) ->
+      let _, zs, f =
+        try sub_extyp oneway env (ExT([], t1)) s2 []
+        with Sub e -> raise (Sub (Wrap e)) in
+      [], zs, IL.TupE["wrap", IL.AppE(f, e1)]
+
+    | WrapT(ExT([], _) as s1), t2 when oneway && not (is_undet t2) ->
+      let _, zs, f =
+        try sub_extyp oneway env s1 (ExT([], t2)) []
+        with Sub e -> raise (Sub (Wrap e)) in
+      [], zs, IL.DotE(e1, "wrap")
+
     | t1, FunT(aks21, t21, ExT(aks22, t22), Implicit) ->
+      assert (aks22 = []);
+      let ts, zs, f = sub_typ oneway (add_typs aks21 env) t1 t22 ps in
+      List.map (fun t -> LamT(aks21, t)) ts, lift env zs,
+      IL.genE(erase_bind aks21, (IL.LamE("y", erase_typ t21, IL.AppE(f, e1))))
+
+    | t1, FunT(aks21, t21, ExT(aks22, t22), ImplicitModule) ->
       assert (aks22 = []);
       let ts, zs, f = sub_typ oneway (add_typs aks21 env) t1 t22 ps in
       List.map (fun t -> LamT(aks21, t)) ts, lift env zs,
@@ -207,6 +225,14 @@ let rec sub_typ oneway env t1 t2 ps =
       ts2, zs1 @ zs2,
       IL.AppE(f, IL.AppE(IL.instE(e1, List.map erase_typ ts1),
         materialize_typ (subst_typ (subst aks11 ts1) t11)))
+
+    | FunT(aks11, t11, ExT(aks12, t12), ImplicitModule), t2 ->
+      assert (aks12 = []);
+      let ts1, zs1 = guess_typs (Env.domain_typ env) aks11 in
+      let t1' = subst_typ (subst aks11 ts1) t12 in
+      let ts2, zs2, f = sub_typ oneway env t1' t2 ps in
+      ts2, zs1 @ zs2,
+      IL.AppE(f, IL.instE(e1, List.map erase_typ ts1))
 
     | TypT(s1), TypT(s2) ->
       (match s1, s2, ps with
@@ -242,24 +268,12 @@ let rec sub_typ oneway env t1 t2 ps =
       IL.genE(erase_bind aks2, (IL.LamE("y", erase_typ t21,
         IL.AppE(f2, IL.AppE(IL.instE(e1, List.map erase_typ ts1),
           IL.AppE(f1, IL.VarE("y")))))))
-          
+
     | WrapT(s1), WrapT(s2) ->
       let _, zs, f =
         try sub_extyp oneway env s1 s2 []
         with Sub e -> raise (Sub (Wrap e)) in
       [], zs, IL.TupE["wrap", IL.AppE(f, IL.DotE(e1, "wrap"))]
-
-    | t1, WrapT(s2) when oneway && not (is_undet t1) ->
-      let _, zs, f =
-        try sub_extyp oneway env (ExT([], t1)) s2 []
-        with Sub e -> raise (Sub (Wrap e)) in
-      [], zs, IL.TupE["wrap", IL.AppE(f, e1)]
-
-    | WrapT(ExT([], _) as s1), t2 when oneway && not (is_undet t2) ->
-      let _, zs, f =
-        try sub_extyp oneway env s1 (ExT([], t2)) []
-        with Sub e -> raise (Sub (Wrap e)) in
-      [], zs, IL.DotE(e1, "wrap")
 
     | AppT(t1', ts1), AppT(t2', ts2) ->
       (try
@@ -352,14 +366,6 @@ let rec sub_typ oneway env t1 t2 ps =
     | t1, (InferT(z) as t2) ->
       if not (resolve_typ z t1) then raise (Sub (Mismatch(t1, t2)));
       [], [], e1
-
-    | t1', AppT(InferT(z), [t2']) -> 
-      (* TODO *)
-      (try let zs1 = equal_typ env t1' t2' in
-        resolve_always z (LamT(["abc", BaseK], VarT("abc", BaseK)));
-        [], zs1, e1
-      with Sub e ->
-        raise (Sub (Mismatch(t1, t2))))  
 
     | t1', t2' when unify_typ t1' t2' ->
       [], [], e1

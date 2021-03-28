@@ -1,17 +1,70 @@
-;; TODO: somehow simulate ADTs?
-
-type z = {
-    type t
-    Z : t
+type z' = {
+    type zt
+    Z : zt
 }
 
-type s = {
-    type n
-    type t
-    S : n -> t
+z :> z' = {
+    type zt = wrap (a : type) -> a -> a
+    Z = fun (a : type) (a' : a) => a'
 }
+...z
+
+type s' = {
+    type st n
+    S 'n : n -> st n
+}
+
+s :> s' = {
+    type st n = wrap (a : type) -> (n -> a) -> a
+    S 'n x = fun (a : type) (f : n -> a) => f x
+}
+...s
 
 type N = {
     type t
     n : t
 }
+
+implicit Zero = {
+    type t = zt
+    n = Z
+}
+
+implicit Suc [N : N] = {
+    type t = st N.t
+    n = S N.n
+}
+
+type ADD = {
+    type at
+    type bt
+    type ct
+    a : at
+    b : bt
+    c : ct
+}
+
+add [Add : ADD] (a : Add.at) (b : Add.bt) = Add.c
+
+implicit AddZ [B : N] = {
+    type at = zt
+    type bt = B.t
+    type ct = B.t
+    a = Z
+    b = B.n
+    c = B.n
+}
+
+implicit AddS [A : N] [B : N] [Add : ADD with (at = A.t) with (bt = B.t)] = {
+    type at = st A.t
+    type bt = B.t 
+    type ct = st Add.ct
+    a = S A.n
+    b = B.n
+    c = S Add.c
+}
+
+test1 = add (S Z) Z 
+
+;;test termination
+;;test2 = add (add (S Z) (S Z)) (S Z)

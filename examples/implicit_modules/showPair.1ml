@@ -1,4 +1,4 @@
-local import "prelude"
+import "prelude"
 
 type SHOW = {
     type t
@@ -23,4 +23,12 @@ implicit Show_pair [S1 : SHOW] [S2 : SHOW] = {
     show (x, y) = "(" ++ S1.show x ++ "," ++ S2.show y ++ ")"
 }
 
+;; TODO: hidden renaming (S1.t, S11.t)
+;; printpair [S1 : SHOW] [S2 : SHOW] (a : S1.t) (b : S2.t) = Text.print ("(" ++ show a ++ "," ++ show b ++ ")")
+
+printpair [So : SHOW] [St : SHOW] (a : So.t) (b : St.t) = Text.print ("(" ++ show a ++ "," ++ show b ++ ")")
+
 do print (5, true)
+
+;; resolving before it should (issues with the definition of top-level)
+;; do printpair 5 true

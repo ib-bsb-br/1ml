@@ -72,6 +72,7 @@ val lookup_val : var -> env -> typ (* raise Error *)
 
 type 'a subst = (var * 'a) list
 
+val subst_row : (exp subst -> exp -> exp) -> exp subst -> exp row -> exp row
 val subst_typ : typ subst -> typ -> typ
 val subst_typ_exp : typ subst -> exp -> exp
 val subst_exp : exp subst -> exp -> exp

@@ -7,11 +7,13 @@ open Types
 open Env
 open Sub
 open Erase
+open Implicitsearch
 
 module EL = Syntax
 
 let quote x = "`" ^ x ^ "'"
 
+let toplevel = ref true
 
 (* Verification *)
 
@@ -166,38 +168,6 @@ let rec fully fn pre r =
   match pre fn r with
   | None -> r
   | Some r -> fully fn pre r
-
-let rec expand_function = function 
-  | FunT(aks1, t1, ExT([], t2), ImplicitModule) -> 
-    let args, res, aks2 = expand_function t2 in t1 :: args, res, aks1 @ aks2
-  | x -> ([], x, [])
-
-let rec implicit_search env aks1 t1 zs = 
-  List.filter_map(fun v -> let cand = Env.lookup_val v env in 
-  let ts', zs' = guess_typs (Env.domain_typ env) aks1 in
-  let t1'' = subst_typ 
-    (List.map (fun ((a, b), c) -> (a, match !c with | Det (InferT _) -> b | Det t -> t | _ -> b))
-    (List.combine (List.combine (List.map fst aks1) ts') zs)) t1 in
-  match cand with 
-  | FunT(_, _, _, ImplicitModule) -> 
-    let argTs, resT, aks2 = expand_function cand in
-    let ts2, zs2 = guess_typs (Env.domain_typ env) aks2 in
-    let argTs = List.map (subst_typ (subst aks2 ts2)) argTs in
-    let resT = (subst_typ (subst aks2 ts2) resT) in
-    let sub = try Some (sub_typ env resT t1'' (varTs aks2)) with Sub _ -> None in
-    let term = List.fold_left (fun e argT -> 
-    Option.bind e (fun e -> 
-    (match sub with
-    | None -> None
-    | _ -> let candidates = implicit_search env aks2 argT zs2 in
-      let term, _ = List.hd candidates in
-      if (List.length candidates = 1) then (Some (EL.asVarE(term, fun k -> 
-                                                  EL.asVarE(e, fun f -> 
-                                                   EL.AppE(f, k, EL.Expl@@nowhere_region)@@nowhere_region)@@nowhere_region)@@nowhere_region)) else None))) 
-      (Some (EL.VarE(v@@nowhere_region)@@nowhere_region)) argTs in
-    Option.map (fun e -> (e, resT)) term
-  | _ ->
-    try sub_typ env cand t1'' (varTs aks1); Some ((EL.VarE (v@@nowhere_region))@@nowhere_region, cand) with Sub _ -> None) (Env.impl_names env)
 
 (* Instantiation *)
 
@@ -362,7 +332,7 @@ and elab_dec env dec l =
   | EL.SeqD(dec1, dec2) ->
     (match elab_dec env dec1 l with
     | ExT(aks1, StrT(tr1)), zs1 ->
-      (match elab_dec (add_row tr1 (add_typs aks1 env) false false) dec2 l with
+      (match elab_dec (add_row tr1 (add_typs aks1 env) false) dec2 l with
       | ExT(aks2, StrT(tr2)), zs2 ->
         let ls = intersect_row tr1 tr2 in
         if ls <> [] then
@@ -431,30 +401,24 @@ and elab_fun env tf var1 var2 e = match freshen_typ env tf with
   let s = ExT([], t2) in
   resolve_always z (FunT([], t1, s, Explicit Impure));
   [], t1, s, Impure, zs1 @ zs2, false, e
-| FunT(aks1, t1, ExT([], FunT([], t3, s, p)), ImplicitModule) -> 
-  let t2 = lookup_val var2.it env in 
-  let ts, zs = guess_typs (Env.domain_typ env) aks1 in 
-  let t1' = (subst_typ (subst aks1 ts) t1) in
-  let t3 = (subst_typ (subst aks1 ts) t3) in
-  let s = (subst_extyp (subst aks1 ts) s) in
-  let term, typ = (if is_explicit_module var2.it env then (IL.VarE(var2.it), t2) else
-    (sub_typ env t2 t3 (varTs aks1);
-    let candidates = implicit_search env aks1 t1 zs in
-    List.iter (fun (elterm, _) -> print_string (EL.string_of_exp elterm)) candidates;
-    assert (List.length candidates == 1);
-    let elterm, typ = List.hd candidates in
-    let _, _, _, term = elab_exp env elterm "" in
-    term, typ)) in
-  sub_typ env typ t1' (varTs aks1);
+| FunT(aks1, t1, t2, ImplicitModule) as impf -> 
   if is_explicit_module var2.it env then 
-      [], t1', ExT([], FunT([], t3, s, p)), Impure, [], false, e
+    aks1, t1, t2, Impure, [], false, e
   else 
-    [], t3, s, Impure, [], true, IL.AppE(e, term)
-| FunT(aks1, t1, s, ImplicitModule) -> 
-  let ts, zs = guess_typs (Env.domain_typ env) aks1 in 
-  let t1' = (subst_typ (subst aks1 ts) t1) in
-  let s = (subst_extyp (subst aks1 ts) s) in
-  [], t1', s, Impure, [], true, e
+    let argTs, res, aks' = expand_function impf in 
+    let ts, zs = guess_typs (Env.domain_typ env) aks' in 
+    let vs = List.map (fun argT -> 
+      let v = "%_i" ^ (string_of_int (List.length !unresolved_impls)) in
+      let argT' = (subst_typ (subst aks' ts) argT) in
+      unresolved_impls := (create_implicit v argT aks' zs argT') :: !unresolved_impls;  
+      v
+    ) argTs in
+    (match res with 
+    | FunT([], t3, s, p) -> 
+      let t3' = (subst_typ (subst aks' ts) t3) in
+      let s' = (subst_extyp (subst aks' ts) s) in
+      [], t3', s', Impure, [], true, List.fold_left (fun acc v -> IL.AppE(acc, IL.VarE(v))) e vs
+    | t3 -> assert false)
 | _ -> print_typ (freshen_typ env tf); error var1.at "expression is not a function"
 
 
@@ -483,8 +447,14 @@ Trace.debug (lazy ("[VarE] s = " ^ string_of_norm_extyp (ExT([], lookup_var env 
   | EL.FunE(var, typ, exp2, impl) ->
 Trace.debug (lazy ("[FunE] " ^ string_of_region exp.at));
     let ExT(aks, t) as s1, zs1 = elab_typ env typ var.it in
+    (match impl.it with
+      | EL.ImplModule -> register_impl_bind var.it t aks
+      | _ -> ());
     let s, p, zs2, e2 =
-      elab_exp ((match impl.it with | EL.ImplModule -> add_impl_val | _ -> add_val) var.it t (add_typs aks env)) exp2 "" in
+      elab_exp (add_val var.it t (add_typs aks env)) exp2 "" in
+    (match impl.it with
+    | EL.ImplModule -> remove_last_impl_bind ()
+    | _ -> ());
 Trace.debug (lazy ("[FunE] s1 = " ^ string_of_norm_extyp s1));
 Trace.debug (lazy ("[FunE] s2 = " ^ string_of_norm_extyp s));
 Trace.debug (lazy ("[FunE] env =" ^ VarSet.fold (fun a s -> s ^ " " ^ a) (domain_typ env) ""));
@@ -496,7 +466,8 @@ Trace.debug (lazy ("[FunE] env =" ^ VarSet.fold (fun a s -> s ^ " " ^ a) (domain
       | _, ImplicitModule -> ImplicitModule
       | _ -> error impl.at "impure function cannot be implicit" in
     ExT([], FunT(aks, t, s, p')), Pure,
-    lift (* TODO: _warn exp.at *) (FunT(aks, t, s, p')) env (zs1 @ zs2),
+    lift (* TODO: _warn exp.at *) (FunT(aks, t, s, p')) 
+      (match impl.it with | EL.ImplModule -> add_typs aks env | _ -> env) (zs1 @ zs2),
     IL.genE(erase_bind aks, IL.LamE(var.it, erase_typ t, e2))
 
   | EL.WrapE(var, typ) ->
@@ -714,6 +685,7 @@ and elab_bind env bind l =
       | EL.ModuleArgE _ -> true
       | _ -> false ) in 
     let ExT(aks, t), p, zs, e = elab_genexp env exp (append_path l l') in
+    if i then register_impl_bind var.it t aks;
     Trace.bind (lazy ("[VarB] " ^ l' ^ " : " ^
       string_of_norm_extyp (ExT(aks, t))));
     let s = ExT(aks, StrT[l', t]) in
@@ -749,7 +721,7 @@ and elab_bind env bind l =
   | EL.SeqB(bind1, bind2) ->
     (match elab_bind env bind1 l with
     | ExT(aks1, StrT(tr1)), p1, zs1, e1, (i, expl_module) ->
-      (match elab_bind (add_row tr1 (add_typs aks1 env) i expl_module) bind2 l with
+      let res = (match elab_bind (add_row tr1 (add_typs aks1 env) expl_module) bind2 l with
       | ExT(aks2, StrT(tr2)), p2, zs2, e2, i ->
         let tr1' = diff_row tr1 tr2 in
         let s = ExT(aks1 @ aks2, StrT(tr1' @ tr2)) in
@@ -772,7 +744,7 @@ Trace.debug (lazy ("[SeqB] s = " ^ string_of_norm_extyp s));
           )
         ), (false, false)
       | _ -> error bind.at "internal SeqB2"
-      )
+      ) in if i then remove_last_impl_bind (); res
     | _ -> error bind.at "internal SeqB1"
     )
 
@@ -782,13 +754,22 @@ and elab_genexp env exp l =
   let a1 = freshen_var env "$" in
 Trace.debug (lazy ("[GenE] " ^ EL.string_of_exp exp));
 Trace.debug (lazy ("[GenE] a1 = " ^ string_of_typ (VarT(a1, BaseK))));
+  let is_toplevel = !toplevel in
+  toplevel := false;
   let ExT(aks, t) as s, p, zs, e = elab_exp (add_typ a1 BaseK env) exp l in
+  toplevel := is_toplevel;
+  let e = 
+    if not is_toplevel then e else
+    let subst = resolve_implicits env !unresolved_impls in
+    unresolved_impls := [];
+    dummy_subst (List.map (fun (v, e1, f, env') -> let _, _, _, e' = elab_exp env' e1 "" in (v, IL.AppE(f, e'))) subst) e in
+  let zs' = filter_out_implicit_related (lift level t (add_typs aks env) zs) in
   let zs1, zs2 =
     List.partition (fun z ->
       match !z with
       | Undet u -> u.level >= level
       | Det _ -> assert false
-    ) (lift level t (add_typs aks env) zs) in
+    ) zs' in
   if p = Impure || zs1 = [] then
     s, p, zs1 @ zs2, e
   else begin

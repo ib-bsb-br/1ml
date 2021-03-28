@@ -1,4 +1,4 @@
-local import "prelude"
+import "prelude"
 import "../../basis/list.1ml"
 
 type SHOW = {

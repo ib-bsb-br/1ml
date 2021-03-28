@@ -29,4 +29,7 @@ sqrt [S: SQRTABLE] = S.sqrt
 double [S: SUMMABLE] x = S.sum x x
 
 ;; should be typed as float -> float
-sqrt_double x = double (sqrt x)
+sqrt_double1 x = double (sqrt x)
+sqrt_double2 x = sqrt (double x)
+
+test = sqrt_double1 0.5

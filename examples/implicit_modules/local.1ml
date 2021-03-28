@@ -1,0 +1,27 @@
+import "prelude"
+
+type SHOW = {
+    type t
+    show : t -> text
+}
+
+show [S: SHOW] x = S.show x
+show2 = fun [S: SHOW] x => S.show x
+
+test = let implicit Show_int = {
+    type t = int
+    show = primitive "Int.toText"
+} in let implicit Show_bool = {
+    type t = bool
+    show x = if x then "true" else "false"
+} in show 5
+
+;; SHADOWING. Should not crash
+
+;;test2 = let implicit S = {
+;;    type t = int
+;;    show = primitive "Int.toText"
+;;} in let implicit S = {
+;;    type t = bool
+;;    show x = if x then "true" else "false"
+;; } in show 5

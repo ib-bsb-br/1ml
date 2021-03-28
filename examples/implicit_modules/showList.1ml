@@ -1,4 +1,4 @@
-local import "prelude"
+import "prelude"
 import "../../basis/list.1ml"
 
 type SHOW = {
@@ -25,8 +25,8 @@ show [S: SHOW] x = S.show x
 
 test1 = show (1 :: (2 :: (3 :: nil)))
 test2 = show ((1 :: (2 :: nil)) :: ((3 :: (4 :: nil)) :: (nil :: ((5 :: (6 :: nil)) :: nil))))
-test3 = show nil
+;; test termination
+;;test3 = show nil
 
 do Text.print (test1 ++ "\n")
 do Text.print (test2 ++ "\n")
-do Text.print (test3 ++ "\n")

@@ -28,7 +28,7 @@ struct
   let rec insert_nodup x = function
     | [] -> [x]
     | x'::xs' as xs ->
-      match compare x x' with
+      match Stdlib.compare x x' with
       | 0 -> xs
       | n when n < 0 -> x::xs
       | n -> x' :: insert_nodup x xs'

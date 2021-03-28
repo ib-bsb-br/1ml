@@ -6,22 +6,21 @@ open Types
 
 module VarMap = Map.Make(String)
 
-type env = {typ : kind VarMap.t; var : typ VarMap.t; impl_var : typ VarMap.t; expl_modules: unit VarMap.t}
+type env = {typ : kind VarMap.t; var : typ VarMap.t; expl_modules: unit VarMap.t}
 
 
 (* Basic operations *)
 
-let empty = {typ = VarMap.empty; var = VarMap.empty; impl_var = VarMap.empty; expl_modules = VarMap.empty}
+let empty = {typ = VarMap.empty; var = VarMap.empty; expl_modules = VarMap.empty}
 
 let add_typ a k env =
   assert (not (VarMap.mem a env.typ)); {env with typ = VarMap.add a k env.typ}
 let add_typs aks env =
   List.fold_left (fun env (a, k) -> add_typ a k env) env aks
 let add_val x t env = {env with var = VarMap.add x t env.var}
-let add_impl_val x t env = {env with var = VarMap.add x t env.var; impl_var = VarMap.add x t env.impl_var}
 let add_expl_module x env = {env with expl_modules = VarMap.add x () env.expl_modules}
-let add_row tr env i expl_module = List.fold_left (fun env (l, t) -> 
-  let env' = (if i then add_impl_val else add_val) l t env in if expl_module then add_expl_module l env' else env'
+let add_row tr env expl_module = List.fold_left (fun env (l, t) -> 
+  let env' = add_val l t env in if expl_module then add_expl_module l env' else env'
   ) env tr
 
 let mem_typ a env = VarMap.mem a env.typ
@@ -36,8 +35,6 @@ let domain_typ env = domain env.typ
 let domain_val env = domain env.var
 
 let names env = List.map fst (VarMap.bindings env.var)
-let impl_names env = List.map fst (VarMap.bindings env.impl_var)
-
 
 (* Freshening *)
 
