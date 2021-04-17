@@ -118,10 +118,8 @@ val contains_extyp : var -> extyp -> bool
 val occurs_typ : undet -> typ -> bool
 val occurs_extyp : undet -> extyp -> bool
 
-(* TODO: remove
-val undet_typ : level -> typ -> infer ref list
-val undet_extyp : level -> extyp -> infer ref list
-*)
+val undet_typ : typ -> undet list
+val undet_extyp : extyp -> undet list
 
 
 (* Substitution *)

@@ -1,0 +1,39 @@
+type NUM = {
+    type t
+    type u
+    type res
+    (+) : t -> u -> res
+}
+
+(+) [N : NUM] = N.(+)
+
+implicit Int_Int = {
+    type t = primitive "int"
+    type u = primitive "int"
+    type res = primitive "int"
+    l + r = primitive "Int.+" (l, r)
+}
+
+implicit Float_Float = {
+    type t = primitive "float"
+    type u = primitive "float"
+    type res = primitive "float"
+    l + r = primitive "Float.+" (l, r)
+}
+
+implicit Int_Float = {
+    type t = primitive "int"
+    type u = primitive "float"
+    type res = primitive "float"
+    l + r = primitive "Float.+" (primitive "Int.toFloat" l, r)
+}
+
+implicit Float_Int = {
+    type t = primitive "float"
+    type u = primitive "int"
+    type res = primitive "float"
+    l + r = primitive "Float.+" (l, primitive "Int.toFloat" r)
+}
+
+x1 = 1.1 + (2 + 3.14)
+x2 = 1.1 + 2 + 3.14

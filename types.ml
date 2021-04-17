@@ -216,34 +216,31 @@ and occurs_extyp u = function
 
 and occurs_row u = List.exists (fun (l, t) -> occurs_typ u t)
 
-
-(* TODO: remove
-let rec undet_typ level = function
+let rec undet_typ = function
   | VarT(a, k) -> []
   | PrimT(t) -> []
-  | StrT(r) -> undet_row level r
+  | StrT(r) -> undet_row r
   | FunT(aks, t, s, f) ->
-    Lib.List.merge_nodup (undet_typ level t) (undet_extyp level s)
-  | TypT(s) -> undet_extyp level s
-  | WrapT(s) -> undet_extyp level s
-  | LamT(aks, t) -> undet_typ level t
+    Lib.List.merge_nodup (undet_typ t) (undet_extyp s)
+  | TypT(s) -> undet_extyp s
+  | WrapT(s) -> undet_extyp s
+  | LamT(aks, t) -> undet_typ t
   | AppT(t, ts) ->
-    Lib.List.merge_nodup (undet_typ level t) (undet_typs level ts)
-  | TupT(r) -> undet_row level r
-  | DotT(t, l) -> undet_typ level t
-  | RecT(ak, t) -> undet_typ level t
+    Lib.List.merge_nodup (undet_typ t) (undet_typs ts)
+  | TupT(r) -> undet_row r
+  | DotT(t, l) -> undet_typ t
+  | RecT(ak, t) -> undet_typ t
   | InferT(z) ->
     match !z with
-    | Det t -> undet_typ level t
-    | Undet u -> if u.level <= level then [] else [z]
+    | Det t -> undet_typ t
+    | Undet u -> [u]
 
-and undet_extyp level = function
-  | ExT(aks, t) -> undet_typ level t
+and undet_extyp = function
+  | ExT(aks, t) -> undet_typ t
 
-and undet_typs level ts =
-  List.fold_left (fun zs t -> Lib.List.merge_nodup zs (undet_typ level t)) [] ts
-and undet_row level r = undet_typs level (List.map snd r)
-*)
+and undet_typs ts =
+  List.fold_left (fun zs t -> Lib.List.merge_nodup zs (undet_typ t)) [] ts
+and undet_row r = undet_typs (List.map snd r)
 
 
 (* Substitution *)
