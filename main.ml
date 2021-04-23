@@ -144,6 +144,7 @@ let process path source =
       print_endline (Syntax.string_of_exp prog)
     end;
     trace_phase "Elaborating...";
+    env := Env.add_val "%_MODULE_HOLE" (PrimT BoolT) !env;
     let sign, _, fprog = Elab.elab !env prog in
     if !Elab.verify_flag then begin
       trace_phase "Checking...";

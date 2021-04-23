@@ -272,6 +272,7 @@ let eol = '\r'?'\n'
 
 rule token = parse
   | "_" { HOLE }
+  | "[_]" { MODULE_HOLE }
   | "&&" { LOGICAL_AND }
   | "as" { AS }
   | "do" { DO }

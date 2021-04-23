@@ -418,7 +418,9 @@ and elab_fun env tf var1 var2 e = match freshen_typ env tf with
       let t3' = (subst_typ (subst aks' ts) t3) in
       let s' = (subst_extyp (subst aks' ts) s) in
       [], t3', s', Impure, [], true, List.fold_left (fun acc v -> IL.AppE(acc, IL.VarE(v))) e vs
-    | t3 -> assert false)
+    | t3 -> if var2.it <> "%_MODULE_HOLE" then assert false else 
+      let t3' = (subst_typ (subst aks' ts) t3) in
+      [], t3', ExT([], PrimT BoolT), Impure, [], true, List.fold_left (fun acc v -> IL.AppE(acc, IL.VarE(v))) e vs)
 | _ -> print_typ (freshen_typ env tf); error var1.at "expression is not a function"
 
 
@@ -547,6 +549,9 @@ Trace.debug (lazy ("[DotE] s = " ^ string_of_extyp s));
     let tf, zs1, ex1 = fully try_peel avar (elab_instvar env var1) in
 Trace.debug (lazy ("[AppE] tf = " ^ string_of_norm_typ tf));
     let aks1, t1, s, p, zs, im, ex1 = elab_fun env tf var1 var2 ex1 in
+    if var2.it = "%_MODULE_HOLE" then 
+      ExT(aks1, t1), p, zs1 @ zs, ex1
+    else 
     let t2 = lookup_var env var2 in
     
 Trace.debug (lazy ("[AppE] s1 = " ^ string_of_norm_extyp (ExT(aks1, t1))));

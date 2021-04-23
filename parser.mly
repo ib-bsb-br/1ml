@@ -25,7 +25,7 @@ let ati i =
 let parse_error s = raise (Source.Error (Source.nowhere_region, s))
 %}
 
-%token HOLE PRIMITIVE
+%token HOLE PRIMITIVE MODULE_HOLE
 %token FUN REC LET IN DO WRAP TYPE ELLIPSIS IMPLICIT
 %token IF THEN ELSE LOGICAL_OR LOGICAL_AND AS
 %token EQUAL COLON SEAL ARROW SARROW DARROW
@@ -395,6 +395,8 @@ atexp :
     { ModuleArgE($2)@@at() }
   | IMPORT TEXT
     { ImportE($2@@ati 2)@@at() }
+  | MODULE_HOLE
+    { VarE("%_MODULE_HOLE"@@at())@@at() }
 ;
 appexp :
   | dotexp
