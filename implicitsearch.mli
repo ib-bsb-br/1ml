@@ -6,7 +6,7 @@ val create_implicit : Types.var -> Types.typ -> (Types.var * Types.kind) list ->
 
 val resolve_implicits : Env.env -> implicit list -> (Types.var * Syntax.exp * IL.exp * Env.env) list
 
-val expand_function : Types.typ -> ((Types.typ) list  * Types.typ * (Types.var * Types.kind) list)
+val expand_function : Types.typ -> ((Types.typ) list  * Types.extyp * (Types.var * Types.kind) list)
 
 type implicit_tree
 

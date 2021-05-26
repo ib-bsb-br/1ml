@@ -27,9 +27,30 @@ let create_implicit v t aks zs tvar = {v = v; t = t; aks = aks; zs = zs; tvar = 
 let rec expand_function = function 
   | FunT(aks1, t1, ExT([], t2), ImplicitModule) -> 
     let args, res, aks2 = expand_function t2 in t1 :: args, res, aks1 @ aks2
-  | x -> ([], x, [])
+  | FunT(aks1, t1, res, ImplicitModule) -> [t1], res, aks1
+  | x -> ([], ExT([], x), [])
 
 let rec infer_helper c def = match !c with | Det (InferT c') -> infer_helper c' def | Det t -> t | _ -> def
+
+module SMap = Map.Make(String)
+module PSet = Set.Make(struct type t = int * string let compare = Stdlib.compare end)
+
+type search_local_state = {
+  curr_cs : typ list;
+  cs_history : (typ list) SMap.t
+}
+type cmp = Gt | Less | Eq | NotCmp
+
+let cmp_typs t1 t2 = if t1 = t2 then Eq else Less
+
+let constrainsts_smaller cs1 cs2 = 
+  let cmps = List.map2 cmp_typs cs1 cs2 in 
+  List.for_all (fun r -> r != Gt && r != NotCmp) cmps &&
+  List.exists (fun r -> r == Less) cmps
+
+let termination_check st v = 
+  let last_cs = SMap.find v st.cs_history in 
+  constrainsts_smaller st.curr_cs last_cs
 
 let rec implicit_search env aks1 t1 zs node = 
   List.filter_map(fun (v, cand, aks') ->
@@ -40,7 +61,8 @@ let rec implicit_search env aks1 t1 zs node =
     (List.combine (List.combine (List.map fst aks1) ts') zs)) t1 in
   match cand with 
   | FunT(_, _, _, ImplicitModule) -> 
-    let argTs, resT, aks2 = expand_function cand in
+    let argTs, ExT(ex, resT), aks2 = expand_function cand in
+    assert (ex = []);
     let ts2, zs2 = guess_typs (Env.domain_typ env) aks2 in
     let argTs = List.map (subst_typ (subst aks2 ts2)) argTs in
     let resT = (subst_typ (subst aks2 ts2) resT) in
@@ -77,10 +99,7 @@ exception ImplSearch of error
 
 type result = Types.var * Syntax.exp * IL.exp * Env.env
 
-module SMap = Map.Make(String)
-module PSet = Set.Make(struct type t = int * string let compare = Stdlib.compare end)
-
-type search_state = {
+type search_global_state = {
     impls : implicit SMap.t;
     vars: (var list) SMap.t;
 

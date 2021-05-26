@@ -182,9 +182,7 @@ let rec instantiate env t e =
           materialize_typ (subst_typ (subst aks1 ts) t1)))
     in t', zs @ zs', e'
   | FunT(aks1, t1, ExT(aks2, t2), ImplicitModule) ->
-    assert (aks2 = []);
-    let ts, zs = guess_typs (Env.domain_typ env) aks1 in
-    t, zs, IL.instE(e, List.map erase_typ ts)
+    t, [], e
   | t -> t, [], e
 
 
@@ -414,13 +412,14 @@ and elab_fun env tf var1 var2 e = match freshen_typ env tf with
       v
     ) argTs in
     (match res with 
-    | FunT([], t3, s, p) -> 
+    | ExT([], FunT([], t3, s, p)) -> 
       let t3' = (subst_typ (subst aks' ts) t3) in
       let s' = (subst_extyp (subst aks' ts) s) in
-      [], t3', s', Impure, [], true, List.fold_left (fun acc v -> IL.AppE(acc, IL.VarE(v))) e vs
+      [], t3', s', Impure, [], true, List.fold_left (fun acc v -> IL.AppE((IL.instE(acc, List.map erase_typ ts), IL.VarE(v)))) e vs
     | t3 -> if var2.it <> "%_MODULE_HOLE" then assert false else 
-      let t3' = (subst_typ (subst aks' ts) t3) in
-      [], t3', ExT([], PrimT BoolT), Impure, [], true, List.fold_left (fun acc v -> IL.AppE(acc, IL.VarE(v))) e vs)
+      let t3' = (subst_extyp (subst aks' ts) t3) in
+      let ExT(ex, t3'') = t3' in
+      ex, t3'', ExT([], PrimT BoolT), Impure, [], true, List.fold_left (fun acc v -> IL.AppE((IL.instE(acc, List.map erase_typ ts), IL.VarE(v)))) e vs)
 | _ -> print_typ (freshen_typ env tf); error var1.at "expression is not a function"
 
 
@@ -549,6 +548,7 @@ Trace.debug (lazy ("[DotE] s = " ^ string_of_extyp s));
     let tf, zs1, ex1 = fully try_peel avar (elab_instvar env var1) in
 Trace.debug (lazy ("[AppE] tf = " ^ string_of_norm_typ tf));
     let aks1, t1, s, p, zs, im, ex1 = elab_fun env tf var1 var2 ex1 in
+    print_typ t1;
     if var2.it = "%_MODULE_HOLE" then 
       ExT(aks1, t1), p, zs1 @ zs, ex1
     else 

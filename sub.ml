@@ -107,7 +107,8 @@ let rec materialize_typ = function
     IL.instE(IL.genE(erase_bind [ak], materialize_typ t), [erase_typ t'])
   | FunT(aks, t1, ExT([], t2), Explicit Pure) ->
     IL.genE(erase_bind aks, IL.LamE("_", erase_typ t1, materialize_typ t2))
-  | _ -> assert false
+  | PrimT Prim.TextT -> IL.PrimE (Prim.TextV "")
+  | t -> print_typ t; assert false
 
 
 (* Lifting *)

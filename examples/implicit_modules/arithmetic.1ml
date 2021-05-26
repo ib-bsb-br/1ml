@@ -65,6 +65,4 @@ implicit AddS [A : N] [B : N] [Add : ADD with (at = A.t) with (bt = B.t)] = {
 }
 
 test1 = add (S Z) Z 
-
-;;test termination
-;;test2 = add (add (S Z) (S Z)) (S Z)
+test2 = add (add (S Z) (S Z)) (S Z)

@@ -5,7 +5,7 @@ type SQRTABLE = {
     sqrt: t -> t
 }
 
-implicit Squarable_float = {
+implicit Squartable_float = {
     type t = primitive "float"
     sqrt = primitive "Float.sqrt"
 }
@@ -31,5 +31,3 @@ double [S: SUMMABLE] x = S.sum x x
 ;; should be typed as float -> float
 sqrt_double1 x = double (sqrt x)
 sqrt_double2 x = sqrt (double x)
-
-test = sqrt_double1 0.5

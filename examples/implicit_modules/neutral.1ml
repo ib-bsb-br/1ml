@@ -1,0 +1,15 @@
+import "../../prelude.1ml"
+
+type NEUTRAL = {
+    type t
+    neutral: t
+}
+
+implicit NeutralAdd = {
+    type t = int
+    neutral = 0
+}
+
+neutral [n : NEUTRAL] = n.neutral
+
+test = 5 + neutral [_]
