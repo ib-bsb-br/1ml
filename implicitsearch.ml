@@ -35,25 +35,73 @@ let rec infer_helper c def = match !c with | Det (InferT c') -> infer_helper c' 
 module SMap = Map.Make(String)
 module PSet = Set.Make(struct type t = int * string let compare = Stdlib.compare end)
 
+type error = 
+    | None_found
+    | Ambiguity
+    | Termination
+
+let string_of_error e = 
+  "implicit resolve failed: " ^
+  match e with 
+  | None_found -> "none matching"
+  | Ambiguity -> "ambiguity"
+  | Termination -> "not terminating"
+
+exception ImplSearch of error
+
 type search_local_state = {
-  curr_cs : typ list;
-  cs_history : (typ list) SMap.t
+  curr_cs : infer list;
+  cs_history : (infer list) SMap.t
 }
-type cmp = Gt | Less | Eq | NotCmp
+type cmp = Gt | Less | Eq
 
-let cmp_typs t1 t2 = if t1 = t2 then Eq else Less
+let eq_typ env t1 t2 = 
+  try let _ = Sub.equal_typ env t1 t2 in true 
+    with Sub.Sub _ -> false
 
-let constrainsts_smaller cs1 cs2 = 
-  let cmps = List.map2 cmp_typs cs1 cs2 in 
-  List.for_all (fun r -> r != Gt && r != NotCmp) cmps &&
+let rec cmp_typs env z1 z2 = 
+  match z1, z2 with
+    | Det t1, Det t2 ->
+      if eq_typ env t1 t2 then Eq else 
+      if is_smaller env (Types.norm_typ t1) (Types.norm_typ t2)
+        then Less else Gt
+    | Det _, Undet _ -> Gt
+    | Undet _, Undet _ -> Eq
+    | Undet _, Det _ -> Less
+
+and is_smaller env t1 t2 = 
+  if eq_typ env t1 t2 then true else
+  match t2 with
+  | VarT(a', k) -> false
+  | PrimT(t) -> false
+  | StrT(r) -> List.exists (fun (_, t) -> is_smaller env t1 t) r
+  | FunT(_, t, ExT(_, t'), _) -> is_smaller env t1 t || is_smaller env t1 t'
+  | TypT(ExT(_, t)) -> is_smaller env t1 t
+  | WrapT(ExT(_, t)) -> is_smaller env t1 t
+  | LamT(_, t) -> is_smaller env t1 t
+  | AppT(t, ts) -> is_smaller env t1 t || List.exists (is_smaller env t1) ts
+  | TupT(r) -> List.exists (fun (_, t) -> is_smaller env t1 t) r
+  | DotT(t, _) -> is_smaller env t1 t
+  | RecT(_, t) -> is_smaller env t1 t
+  | InferT(z) ->
+    match !z with
+    | Det t -> is_smaller env t1 t
+    | Undet _ -> false
+
+let constrainsts_smaller env cs1 cs2 = 
+  let cmps = List.map2 (cmp_typs env) cs1 cs2 in 
+  List.for_all (fun r -> r != Gt) cmps &&
   List.exists (fun r -> r == Less) cmps
 
-let termination_check st v = 
-  let last_cs = SMap.find v st.cs_history in 
-  constrainsts_smaller st.curr_cs last_cs
+let termination_check env st v = 
+  let last_cs = SMap.find_opt v st.cs_history in 
+  match last_cs with
+  | Some last_cs -> constrainsts_smaller env st.curr_cs last_cs
+  | None -> true
 
-let rec implicit_search env aks1 t1 zs node = 
+let rec implicit_search env aks1 t1 zs node st v' =
   List.filter_map(fun (v, cand, aks') ->
+  if (not (termination_check env st v')) then raise (ImplSearch Termination);
   let env = Env.add_typs aks' env in
   let ts', zs' = guess_typs (Env.domain_typ env) aks1 in
   let t1'' = subst_typ 
@@ -70,8 +118,9 @@ let rec implicit_search env aks1 t1 zs node =
     let term = List.fold_left (fun e argT -> 
     Option.bind e (fun (e, env') -> 
     (match sub with
-    | None -> None
-    | _ -> let candidates = implicit_search env aks2 argT zs2 node in
+    | None -> None;
+    | _ -> let candidates = implicit_search env aks2 argT zs2 node
+                              {curr_cs = List.map (!) zs2; cs_history = SMap.add v' st.curr_cs st.cs_history} v in
       let term, _, env' = List.hd candidates in
       if (List.length candidates = 1) then (Some (EL.asVarE(EL.ModuleArgE(term)@@nowhere_region, fun k -> 
                                                   EL.asVarE(e, fun f -> 
@@ -82,20 +131,6 @@ let rec implicit_search env aks1 t1 zs node =
     try Sub.sub_typ env cand t1'' (varTs aks1); 
       Some ((EL.VarE (v@@nowhere_region))@@nowhere_region, cand, Env.add_val v cand env) with Sub.Sub _ -> None) 
       (impl_candidates node)
-
-type error = 
-    | None_found
-    | Ambiguity (* of ? list*)
-    | Termination
-
-let string_of_error e = 
-  "implicit resolve failed: " ^
-  match e with 
-  | None_found -> "none matching"
-  | Ambiguity -> "ambiguity"
-  | Termination -> "not terminating"
-
-exception ImplSearch of error
 
 type result = Types.var * Syntax.exp * IL.exp * Env.env
 
@@ -144,11 +179,14 @@ let update_new_info v state =
 
 let resolve_implicit env v st = 
   let i = SMap.find v st.impls in 
-  match implicit_search env i.aks i.t i.zs i.node with 
-  | [] -> Left None_found
-  | [(e, t', env')] -> let st' = update_new_info v st in
+  let res = try Right (implicit_search env i.aks i.t i.zs i.node {curr_cs = List.map (!) i.zs; cs_history = SMap.empty} "") with
+    ImplSearch Termination -> Left Termination in
+  match res with 
+  | Left _ -> Left Termination
+  | Right [] -> Left None_found
+  | Right [(e, t', env')] -> let st' = update_new_info v st in
                        let _, _, f = Sub.sub_typ env t' i.tvar (varTs i.aks) in Right ((i.v, e, f, env'), st')
-  | res -> Left Ambiguity
+  | Right res -> Left Ambiguity
 
 let rec resolve_step env state = 
   if not (VarSet.is_empty state.unique) then 

@@ -6,6 +6,6 @@ type SHOW = {
     show : t ~> text
 }
 
-combine = rec (f : [A : SHOW] -> [B : SHOW] -> list A.t -> list B.t ~> list (A.t, B.t)) => 
-  fun [A : SHOW] [B : SHOW] a b => 
+combine = rec f => 
+  fun [A : SHOW] [B : SHOW] (a : list A.t) (b : list B.t) => 
     case {nil = nil, x::xs = case {nil = nil, y::ys = (x, y) :: (f xs ys)} b} a

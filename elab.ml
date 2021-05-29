@@ -548,7 +548,6 @@ Trace.debug (lazy ("[DotE] s = " ^ string_of_extyp s));
     let tf, zs1, ex1 = fully try_peel avar (elab_instvar env var1) in
 Trace.debug (lazy ("[AppE] tf = " ^ string_of_norm_typ tf));
     let aks1, t1, s, p, zs, im, ex1 = elab_fun env tf var1 var2 ex1 in
-    print_typ t1;
     if var2.it = "%_MODULE_HOLE" then 
       ExT(aks1, t1), p, zs1 @ zs, ex1
     else 
