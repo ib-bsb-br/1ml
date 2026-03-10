@@ -1,6 +1,4 @@
-# 1ML TOY INTERPRETER [![Gitter](https://badges.gitter.im/1ml-prime/community.svg)](https://gitter.im/1ml-prime/community) [![Build Status](https://travis-ci.org/1ml-prime/1ml.svg?branch=1ml-prime)](https://travis-ci.org/1ml-prime/1ml)
-
-(c) 2014 Andreas Rossberg <rossberg@mpi-sws.org>
+# 1ML INTERPRETER
 
 ## Introduction
 
@@ -25,16 +23,11 @@ A few caveats to keep in mind:
 - Error messages are rather basic, and types are always output in internal F-ing
   notation, with no attempt to abbreviate.
 
-- It is slow and probably buggy. In particular, type checking is implemented
-  very naively, as a direct transliteration of the rules, with no worries about
-  efficiency. Type inference is best considered work in progress. :)
+- In particular, type checking is implemented very naively, as a direct transliteration of the rules, with no worries about efficiency. Type inference is best considered work in progress. :)
 
 - There is no documentation other than this file, and no sample code to speak
   of. See [prelude.1ml](prelude.1ml) for some simple library code, and
   [paper.1ml](paper.1ml) for the examples from the paper.
-
-Nevertheless, feedback on bugs or other comments are highly welcome
-(<rossberg@mpi-sws.org>).
 
 ### Building
 
